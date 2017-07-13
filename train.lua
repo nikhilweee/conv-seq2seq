@@ -23,6 +23,7 @@ local hooks = require 'fairseq.torchnet.hooks'
 local data = require 'fairseq.torchnet.data'
 local search = require 'fairseq.search'
 local utils = require 'fairseq.utils'
+local log = require 'log'
 
 local cuda = utils.loadCuda()
 -- we require cuda for training
@@ -62,6 +63,7 @@ cmd:option('-minepochtoanneal', 0, 'minimum number of epochs before annealing')
 cmd:option('-maxsourcelen', 0,
     'maximum source sentence length in training data')
 cmd:option('-ndatathreads', 1, 'number of threads for data preparation')
+cmd:option('-logfile', 'train.log', 'file to save log output')
 cmd:option('-log_interval', 1000, 'log training statistics every n updates')
 cmd:option('-save_interval', -1,
     'save snapshot every n updates (defaults to once per epoch)')
@@ -103,6 +105,7 @@ cmd:option('-fconv_klmwidths', '',
 
 
 local config = cmd:parse(arg)
+log.outfile = config.logfile
 
 if config.dropout_src < 0 then config.dropout_src = config.dropout end
 if config.dropout_tgt < 0 then config.dropout_tgt = config.dropout end
@@ -139,11 +142,11 @@ config.maxbatch = config.maxbatch * config.ngpus
 -------------------------------------------------------------------
 config.dict = torch.load(plpath.join(config.datadir,
     'dict.' .. config.targetlang .. '.th7'))
-print(string.format('| [%s] Dictionary: %d types', config.targetlang,
+log.info(string.format('| [%s] Dictionary: %d types', config.targetlang,
     config.dict:size()))
 config.srcdict = torch.load(plpath.join(config.datadir,
     'dict.' .. config.sourcelang .. '.th7'))
-print(string.format('| [%s] Dictionary: %d types', config.sourcelang,
+log.info(string.format('| [%s] Dictionary: %d types', config.sourcelang,
     config.srcdict:size()))
 
 if config.aligndictpath ~= '' then
@@ -366,7 +369,7 @@ engine.hooks.onUpdate = hooks.call{
                     ' | avg_dict_size %.2f',
                     state.dictstats.size / state.dictstats.n)
             end
-            print(statsstr)
+            log.info(statsstr)
             io.stdout:flush()
             timeMeter:reset()
             lossMeter:reset()
@@ -384,14 +387,14 @@ engine.hooks.onEnd = saveLastState
 engine.hooks.onSample = hooks.computeSampleStats(config.dict)
 
 if plpath.isfile(lastStatePath) and not config.nosave then
-    print('| Found existing state, attempting to resume training')
+    log.info('| Found existing state, attempting to resume training')
     engine.hooks.onJumpToSample = function(state)
         -- Jumping to a sample can be time-consuming. If, for some reason, you
         -- find yourself frequently resuming from a saved state, increase
         -- -ndatathreads to speed this up -- but keep in mind that this makes
         -- the sample order non-deterministic.
         if state.jumped % config.log_interval == 0 then
-            print(string.format(
+            log.info(string.format(
                 '| epoch %03d | %07d updates | %07d epoch updates | %07d replayed',
                 state.epoch, state.t, state.epoch_t, state.jumped))
         end
@@ -446,7 +449,7 @@ local function runFinalEval()
             outfile = genconfig.outfile,
             srcdict = config.srcdict,
         }(gensets.test)
-        print(string.format('| Test with beam=%d: %s', beam, result))
+        log.info(string.format('| Test with beam=%d: %s', beam, result))
         io.stdout:flush()
     end
 end
