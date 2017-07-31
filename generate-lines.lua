@@ -54,13 +54,15 @@ cmd:option('-fconvfast', false, 'make fconv model faster')
 
 local config = cmd:parse(arg)
 
+-- local dbg = require 'debugger'
+
 -------------------------------------------------------------------
 -- Load data
 -------------------------------------------------------------------
 config.dict = torch.load(config.targetdict)
-print(string.format('| [target] Dictionary: %d types',  config.dict:size()))
+-- print(string.format('| [target] Dictionary: %d types',  config.dict:size()))
 config.srcdict = torch.load(config.sourcedict)
-print(string.format('| [source] Dictionary: %d types',  config.srcdict:size()))
+-- print(string.format('| [source] Dictionary: %d types',  config.srcdict:size()))
 
 if config.aligndictpath ~= '' then
     config.aligndict = tnt.IndexedDatasetReader{
@@ -220,18 +222,28 @@ for sample in dataset() do
     -- Print results
     local sourceString = config.srcdict:getString(sample.source:t()[1])
     sourceString = sourceString:gsub(seos .. '.*', '')
-    print('S', sourceString)
-    print('O', sample.text)
+    -- print('S', sourceString)
+    -- print('O', sample.text)
 
     for i = 1, math.min(config.nbest, config.beam) do
         local hypo = config.dict:getString(hypos[i]):gsub(eos .. '.*', '')
-        print('H', scores[i], hypo)
         -- NOTE: This will print #hypo + 1 attention maxima. The last one is the
         -- attention that was used to generate the <eos> symbol.
         local _, maxattns = torch.max(attns[i], 2)
-        print('A', table.concat(maxattns:squeeze(2):totable(), ' '))
+        -- replace unknowns with source token having max attn
+        local stoks = stringx.split(sample.text)
+        local htoks = stringx.split(hypo)
+        for i = 1, #htoks do
+            if htoks[i] == config.dict.unk then
+                htoks[i] = stoks[maxattns[i][1]]
+            end
+        end
+        print('H', table.concat(htoks, ' '))
+        -- print('A', table.concat(maxattns:squeeze(2):totable(), ' '))
     end
 
     io.stdout:flush()
     collectgarbage()
+
+    break
 end

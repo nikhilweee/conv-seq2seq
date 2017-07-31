@@ -26,7 +26,10 @@ cmd:option('-unk', '<unk>', 'unknown word marker')
 cmd:option('-offset', 0, 'apply offset to attention maxima')
 
 local config = cmd:parse(arg)
-local dict = torch.load(config.dict)
+
+if config.dict ~= "" then
+    local dict = torch.load(config.dict)
+end
 
 local function readFile(path)
     local lines = {}
@@ -88,7 +91,7 @@ for i = 1, #hypos do
                     i, attn))
             else
                 local stok = stoks[attn]
-                if dict[stok] then
+                if (config.dict ~= "" and dict[stok]) then
                     htoks[j] = dict[stok]
                 else
                     htoks[j] = stok

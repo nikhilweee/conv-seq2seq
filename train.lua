@@ -11,6 +11,11 @@
 --
 --]]
 
+-- require("clidebugger")
+-- pause()
+dbg = require('debugger')
+-- dbg()
+
 require 'rnnlib'
 require 'xlua'
 require 'optim'
@@ -195,6 +200,7 @@ local thread_init_fn = function(id)
 end
 
 local make_model_fn = function(id)
+    print('Loading model' .. config.model)
     local model = require(
         string.format('fairseq.models.%s_model',
             config.model)
